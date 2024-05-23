@@ -23,16 +23,21 @@ import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import feign.MethodMetadata;
 import org.eclipse.jetty.client.HttpClient;
-import org.eclipse.jetty.client.api.Request;
+import org.eclipse.jetty.client.Request;
 import org.eclipse.jetty.http.HttpFields;
-import org.eclipse.jetty.reactive.client.ContentChunk;
+import org.eclipse.jetty.io.Content;
 import org.eclipse.jetty.reactive.client.ReactiveRequest;
 import org.reactivestreams.Publisher;
-import reactivefeign.client.*;
+import reactivefeign.client.ReactiveFeignException;
+import reactivefeign.client.ReactiveHttpClient;
+import reactivefeign.client.ReactiveHttpRequest;
+import reactivefeign.client.ReactiveHttpResponse;
+import reactivefeign.client.ReadTimeoutException;
 import reactivefeign.utils.SerializedFormData;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -45,8 +50,19 @@ import static java.util.Collections.singletonList;
 import static org.eclipse.jetty.http.HttpHeader.ACCEPT;
 import static org.eclipse.jetty.http.HttpHeader.ACCEPT_ENCODING;
 import static reactivefeign.jetty.utils.ProxyPostProcessor.postProcess;
-import static reactivefeign.utils.FeignUtils.*;
-import static reactivefeign.utils.HttpUtils.*;
+import static reactivefeign.utils.FeignUtils.getBodyActualType;
+import static reactivefeign.utils.FeignUtils.returnActualType;
+import static reactivefeign.utils.FeignUtils.returnPublisherType;
+import static reactivefeign.utils.HttpUtils.APPLICATION_JSON;
+import static reactivefeign.utils.HttpUtils.APPLICATION_JSON_UTF_8;
+import static reactivefeign.utils.HttpUtils.APPLICATION_OCTET_STREAM;
+import static reactivefeign.utils.HttpUtils.APPLICATION_STREAM_JSON;
+import static reactivefeign.utils.HttpUtils.APPLICATION_STREAM_JSON_UTF_8;
+import static reactivefeign.utils.HttpUtils.FORM_URL_ENCODED;
+import static reactivefeign.utils.HttpUtils.GZIP;
+import static reactivefeign.utils.HttpUtils.NEWLINE_SEPARATOR;
+import static reactivefeign.utils.HttpUtils.TEXT;
+import static reactivefeign.utils.HttpUtils.TEXT_UTF_8;
 
 /**
  * Uses reactive Jetty client to execute http requests
@@ -124,11 +140,11 @@ public class JettyReactiveHttpClient implements ReactiveHttpClient {
 				new JettyReactiveHttpResponse(request, response.getResponse(),
 						postProcess(content,
 								(contentChunk, throwable) -> {
-									if(throwable != null){
-										contentChunk.callback.failed(throwable);
-									} else {
-										contentChunk.callback.succeeded();
-									}
+//									if(throwable != null){
+//										contentChunk.callback.failed(throwable);
+//									} else {
+//										contentChunk.callback.succeeded();
+//									}
 								}),
 						returnPublisherClass, returnActualClass,
 						jsonFactory, responseReader))))
@@ -167,7 +183,7 @@ public class JettyReactiveHttpClient implements ReactiveHttpClient {
 	}
 
 	protected ReactiveRequest.Content provideBody(ReactiveHttpRequest request) {
-		Publisher<ContentChunk> bodyPublisher;
+		Publisher<Content.Chunk> bodyPublisher;
 		String contentType;
 		if(request.body() instanceof SerializedFormData){
 			bodyPublisher =  Mono.just(toByteBufferChunk(((SerializedFormData)request.body()).getFormData()));
@@ -203,17 +219,17 @@ public class JettyReactiveHttpClient implements ReactiveHttpClient {
 		return ReactiveRequest.Content.fromPublisher(bodyPublisher, contentType);
 	}
 
-	protected ContentChunk toByteBufferChunk(Object data){
-		return new ContentChunk((ByteBuffer)data);
+	protected Content.Chunk toByteBufferChunk(Object data){
+		return Content.Chunk.from((ByteBuffer)data, false);
 	}
 
-	protected ContentChunk toCharSequenceChunk(Object data){
+	protected Content.Chunk toCharSequenceChunk(Object data){
 		CharBuffer charBuffer = CharBuffer.wrap((CharSequence) data);
 		ByteBuffer byteBuffer = UTF_8.encode(charBuffer);
-		return new ContentChunk(byteBuffer);
+		return Content.Chunk.from(byteBuffer, false);
 	}
 
-	protected ContentChunk toJsonChunk(Object data, boolean stream){
+	protected Content.Chunk toJsonChunk(Object data, boolean stream){
 		try {
 			ByteArrayBuilder byteArrayBuilder = new ByteArrayBuilder();
 			bodyWriter.writeValue(byteArrayBuilder, data);
@@ -221,14 +237,13 @@ public class JettyReactiveHttpClient implements ReactiveHttpClient {
 				byteArrayBuilder.write(NEWLINE_SEPARATOR);
 			}
 			ByteBuffer buffer = ByteBuffer.wrap(byteArrayBuilder.toByteArray());
-			return new ContentChunk(buffer);
-		} catch (java.io.IOException e) {
+			return Content.Chunk.from(buffer, false);
+		} catch (IOException e) {
 			throw new UncheckedIOException(e);
 		}
 	}
 
 	public static Class getClass(Type type){
-		return (Class)(type instanceof ParameterizedType
-				? ((ParameterizedType) type).getRawType() : type);
+		return (Class)(type instanceof ParameterizedType pt ? pt.getRawType() : type);
 	}
 }

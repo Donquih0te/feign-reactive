@@ -139,7 +139,7 @@ public class Java11ReactiveHttpClient implements ReactiveHttpClient {
 		return Mono.fromFuture(response)
 				.<ReactiveHttpResponse>map(resp -> {
 					if(!resp.version().equals(httpClient.version())){
-						throw new IllegalArgumentException("Incorrect response version:"+resp.version());
+						throw new IllegalArgumentException("Incorrect response version:"+resp.version() + " must be: "+httpClient.version());
 					}
 					return new Java11ReactiveHttpResponse(request, resp, bodySubscriber.content(),
 							returnPublisherClass, returnActualClass,

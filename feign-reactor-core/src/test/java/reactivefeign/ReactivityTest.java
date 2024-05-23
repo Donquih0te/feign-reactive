@@ -17,6 +17,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.jupiter.api.RepeatedTest;
 import reactivefeign.testcase.IcecreamServiceApi;
 import reactivefeign.testcase.domain.OrderGenerator;
 import reactor.core.publisher.Mono;

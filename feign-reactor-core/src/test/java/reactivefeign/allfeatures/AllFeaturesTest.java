@@ -251,7 +251,7 @@ abstract public class AllFeaturesTest extends BaseReactorTest {
 	public void shouldReturnAllPassedMultiMapHeaders() {
 		Map<String, List<String>> headersMap = new HashMap<String, List<String>>() {
 			{
-				put("headerKey1", asList("headerValue1", "headerValue2"));
+				put("headerKey1", asList("headerValue1, headerValue2"));
 			}
 		};
 		Map<String, List<String>> returned = client.mirrorMultiMapHeaders(headersMap)
@@ -435,7 +435,7 @@ abstract public class AllFeaturesTest extends BaseReactorTest {
 			countDownLatch.countDown();
 		}).subscribe();
 
-		countDownLatch.await();
+		countDownLatch.await(10, TimeUnit.SECONDS);
 
 		assertThat(receivedAll).containsExactly(new byte[]{1,2,3}, new byte[]{4,5,6});
 	}
